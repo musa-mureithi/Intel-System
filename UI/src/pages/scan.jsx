@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import {useEffect, useRef, useState } from "react";
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = "https://75lsvb8q-8000.inc1.devtunnels.ms";
 
 function Scan() {
   const [image, setImage] = useState(null);
@@ -21,13 +21,13 @@ function Scan() {
       setError("Camera access denied");
     }
   };
-  const captureImage = () => {
+  const captureImage = async () => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
 
-    if (!video.videoWidth || !video.videoHeight) {
-      setError("Camera not ready yet");
-      return;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+        setError("Camera not ready yet. Start the camera first.");
+        return null;
     }
 
     canvas.width = video.videoWidth;
@@ -37,9 +37,13 @@ function Scan() {
     ctx.drawImage(video, 0, 0);
 
     return new Promise((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg");
+        canvas.toBlob(
+            (blob) => resolve(blob),
+            "image/jpeg",
+            0.9
+        );
     });
-  };
+};
 
   const handleSearch = async (useCamera = false) => {
     setError("");
@@ -53,12 +57,15 @@ function Scan() {
       const formData = new FormData();
 
       if (useCamera) {
-        const blob = await captureImage();
-        if (!blob) return; 
-        formData.append("image", blob, "capture.jpg");
-      } else if (image) {
-        formData.append("image", image);
-      }
+    const blob = await captureImage();
+
+    if (!blob) return;
+
+    formData.append("image_file", blob, "capture.jpg");
+
+    } else if (image) {
+      formData.append("image_file", image);
+    }
 
       if (identity) formData.append("identity_number", identity);
       if (dna) formData.append("dna_id", dna);
@@ -83,6 +90,18 @@ function Scan() {
     }
   };
 
+  {/*STOP'S THE CAMERA WHEN THE CAPTURE IS OVER */}
+useEffect(() => {
+    return () => {
+        const stream = videoRef.current?.srcObject;
+
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+    };
+}, []);
+
+
   return (
     <div className="container">
       <h1 style={{ color: "white" }}> {'search'.toUpperCase()}</h1>
@@ -101,7 +120,7 @@ function Scan() {
       />
 
       <div style={{ marginTop: "15px" }}>
-        <video ref={videoRef} autoPlay width="250" />
+        <video ref={videoRef} autoPlay playsInline width="250" />
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
         <br />
@@ -119,7 +138,7 @@ function Scan() {
           <p>Status: {result.status}</p>
           <p>DNA: {result.id_dna}</p>
           <p>UNIT : {result.unit_type}</p>
-          <p>OPs:{result.OperationAssignment}</p>
+          <p>OPs: {result.OperationAssignment.join(", ")}</p>
           
 
           {result.match_confidence && <p>Confidence: {result.match_confidence}</p>}

@@ -1,11 +1,9 @@
-from urllib import request
-
+#from urllib import request
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
-#from django.contrib.admin.views.decorators import staff_member_required
 from .models import AuditLog
 from audit.utils import log_action
 from Agency.models import Person, Operation, Report
@@ -15,6 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.paginator import Paginator
+from .security import sanitize_audit_data
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated]) 
@@ -29,16 +29,20 @@ def get_logs(request):
     logs = AuditLog.objects.all().order_by("-timestamp")
 
     # Filtering
+    id =request.GET.get("id")
     user = request.GET.get("user")
-    action = request.GET.get("API Call")
+    action = request.GET.get("action")
     start = request.GET.get("start")
     end = request.GET.get("end")
+
+    if id:
+        logs = logs.filter(id=id)
 
     if user:
         logs = logs.filter(user__username=user)
 
     if action:
-        allowed_actions = ["CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT"]
+        allowed_actions = ["CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT", "VIEW", "SEARCH", "API_CALL"]
         if action in allowed_actions:
             logs = logs.filter(action_type=action)
 
@@ -55,12 +59,17 @@ def get_logs(request):
         {
             "id": log.id,
             "user": str(log.user),
-            "action": log.action_type,
+           "action": log.action_type,
             "resource": log.resource,
             "resource_id": log.resource_id,
             "ip": log.ip_address,
             "time": log.timestamp,
             "description": log.description,
+            "old_data": sanitize_audit_data(log.old_data),
+            "new_data": sanitize_audit_data(log.new_data),
+            "request_data": sanitize_audit_data(log.request_data),
+            "response_data": sanitize_audit_data(log.response_data),
+            
         }
         for log in page_obj
     ]
@@ -94,6 +103,7 @@ def get_report(request, id):
         resource_id=id,
         request=request,
         new_data=response_data
+
     )
 
     return JsonResponse(response_data)
@@ -156,6 +166,7 @@ def get_person(request, id):
         resource="Person",
         resource_id=id,
         request=request,
+        new_data=response_data,
     )
 
     return JsonResponse(response_data)

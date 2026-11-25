@@ -116,9 +116,9 @@ class Report(models.Model):
     operation = models.ForeignKey(Operation, on_delete=models.CASCADE, related_name='reports')
     content = EncryptedTextField()
     author = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, related_name='reports')
-    subject = EncryptedCharField(max_length=100, blank=True)
+    subject = EncryptedCharField(max_length=10000, blank=True)
     role_based_access = models.CharField(
-        max_length=100,
+        max_length=1000,
         choices=[
             ('TOP-SECRET', 'TOP-SECRET'),
             ('SECRET', 'SECRET'),

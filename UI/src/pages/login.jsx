@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = "https://75lsvb8q-8000.inc1.devtunnels.ms";
 
 const Login = () => {
   const navigate = useNavigate();

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class AuditLog(models.Model):
-    
+    id = models.AutoField(primary_key=True)
     ACTION_TYPES = [
         ("LOGIN", "Login"),
         ("LOGOUT", "Logout"),

@@ -1,4 +1,5 @@
 import os
+import logging
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.http import JsonResponse
@@ -6,10 +7,13 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.tokens import RefreshToken
 import json
 from django.contrib.auth import get_user_model
+from setuptools import Require
 User = get_user_model()
 from .models import Operation, Report, Person, OperationAssignment
 from .security import FIELD_CLEARANCE
 from deepface import DeepFace
+import tempfile
+import traceback
 from .services.faiss_service import search_face
 import pyotp
 import qrcode
@@ -84,6 +88,7 @@ def login_view(request):
 
         totp = pyotp.TOTP(person.totp_secret)
         if not totp.verify(otp_code):
+          
             return JsonResponse({"status": "error", "message": "Invalid OTP"}, status=401)
 
         # Generate JWT tokens
@@ -467,74 +472,126 @@ def list_reports(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def unified_search(request):
+
     """
     Unified search endpoint.
     Search by image, identity_number, or DNA ID.
     """
+
     image_file = request.FILES.get("image_file")
-    identity_number = request.data.get("identity_number", "").strip()
-    dna_id = request.data.get("dna_id", "").strip()
+    identity_number = (request.data.get("identity_number") or "").strip()
+    dna_id = (request.data.get("dna_id") or "").strip()
 
     try:
-        
+
+        # 1. IMAGE SEARCH
         if image_file:
-            temp_path = os.path.join(settings.BASE_DIR, "temp_upload.jpg")
-            # Save uploaded image temporarily
-            with open(temp_path, "wb") as f:
-                for chunk in image_file.chunks():
-                    f.write(chunk)
 
-            
-            result = DeepFace.represent(
-                img_path=temp_path,
-                enforce_detection=True
-            )
+            temp_path = None
 
-           
-            os.remove(temp_path)
+            try:
+                # Create a temporary image file
+                with tempfile.NamedTemporaryFile(
+                    suffix=".jpg",
+                    delete=False
+                ) as temp_file:
 
-            if not result or len(result) == 0:
-                return Response({"message": "Face embedding extraction failed"}, status=400)
+                    temp_path = temp_file.name
 
-            upload_embedding = result[0]['embedding']
-            
+                    for chunk in image_file.chunks():
+                        temp_file.write(chunk)
 
-           
-            person, distance = search_face(upload_embedding)
-            if not person:
-                return Response({"message": "No match found"}, status=404)
+                print("IMAGE RECEIVED:", image_file.name, flush=True)
+                print("IMAGE SIZE:", image_file.size, flush=True)
 
-            return _build_response(request, person, distance)
+                # Extract face embedding
+                result = DeepFace.represent(
+                    img_path=temp_path,
+                    model_name='Facenet',
+                    enforce_detection=True
+                )
 
-        
+                if not result:
+                    return Response(
+                        {"message": "Face embedding extraction failed"},
+                        status=400
+                    )
+
+                upload_embedding = result[0]["embedding"]
+
+                print(
+                    "EMBEDDING LENGTH:",
+                    len(upload_embedding),
+                    flush=True
+                )
+
+                # Search database for matching face
+                person, distance = search_face(upload_embedding)
+
+                print("PERSON MATCHED:", bool(person), flush=True)
+                print("FACE DISTANCE:", distance, flush=True)
+
+                if not person:
+                    return Response(
+                        {"message": "No match found"},
+                        status=404
+                    )
+
+                return _build_response(request, person, distance)
+
+            finally:
+                # Always remove temporary image
+                if temp_path and os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+        # 2. IDENTITY NUMBER OR DNA SEARCH
         if identity_number or dna_id:
+
             persons = Person.objects.all()
             matched_person = None
 
             for person in persons:
-                decrypted_dna = decrypt(person.id_dna) if person.id_dna else None
 
-                identity_match = identity_number and person.identity_number == identity_number
-                dna_match = dna_id and decrypted_dna == dna_id
+                decrypted_dna = (
+                    decrypt(person.id_dna)
+                    if person.id_dna else None
+                )
+
+                identity_match = (
+                    identity_number
+                    and person.identity_number == identity_number
+                )
+
+                dna_match = (
+                    dna_id
+                    and decrypted_dna == dna_id
+                )
 
                 if identity_match or dna_match:
                     matched_person = person
                     break
 
             if not matched_person:
-                return Response({"message": "Person not found"}, status=404)
+                return Response(
+                    {"message": "Person not found"},
+                    status=404
+                )
 
             return _build_response(request, matched_person)
 
-        
+        # 3. NO SEARCH CRITERIA
         return Response(
             {"error": "Provide image OR identity_number OR dna_id"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception:
+        logging.exception("Unified search failed")
 
+        return Response(
+            {"error": "An error occurred while processing the search"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 def _build_response(request, person, distance=None):

@@ -13,7 +13,7 @@ const useSearch = () => {
       const token = localStorage.getItem("access_token");
       if (!token) return window.location.href = "/login";
 
-      const res = await fetch(`http://127.0.0.1:8000/search_person/?q=${query}`, {
+      const res = await fetch(`https://75lsvb8q-8000.inc1.devtunnels.ms/search_person/?q=${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'audit',
+    'silk',
 
     'cloudinary_storage',
     'cloudinary',
@@ -64,8 +65,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'audit.performance.PerformanceMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'silk.middleware.SilkyMiddleware'
 ]
 
 ROOT_URLCONF = 'CIA.urls'
@@ -154,12 +157,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Allow your frontend to talk to Django
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173", "http://192.168.100.31:5173" # optional, if using 127.0.0.1
+    "http://127.0.0.1:5173", "http://192.168.100.31:5173", "https://75lsvb8q-5173.inc1.devtunnels.ms" # optional, if using 127.0.0.1
 ]
-CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.100.31:5173"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.100.31:5173", "https://75lsvb8q-5173.inc1.devtunnels.ms"]
 CORS_ALLOW_CREDENTIALS = True
 
-
+from datetime import timedelta
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -171,7 +174,7 @@ REST_FRAMEWORK = {
 }
 
 # Optional: JWT token settings
-from datetime import timedelta
+
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),

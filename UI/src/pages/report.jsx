@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "../App.css";
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = "https://75lsvb8q-8000.inc1.devtunnels.ms";
 
 function Report() {
   const [formData, setFormData] = useState({
